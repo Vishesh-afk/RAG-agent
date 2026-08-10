@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: radial-gradient(120% 140% at 14% -10%, rgba(226, 136, 74, 0.09) 0%, transparent 45%),
+      radial-gradient(100% 120% at 100% 0%, rgba(143, 191, 168, 0.08) 0%, transparent 42%), #100f0d;
+    color: #ece5d4;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgba(226, 136, 74, 0.35);
+    color: #f6f2e9;
+  }
+
+  /* Slim, unobtrusive scrollbars that match the ink palette */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #39352f transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #282521;
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #39352f;
+  }
+}
+
+@layer components {
+  /* Markdown rendering for assistant answers */
+  .prose-atlas {
+    @apply prose prose-invert max-w-none prose-p:my-2.5 prose-p:leading-relaxed;
+    @apply prose-headings:font-display prose-headings:font-medium prose-headings:text-paper-100;
+    @apply prose-strong:text-paper-100 prose-strong:font-semibold;
+    @apply prose-a:text-ember-400 prose-a:no-underline hover:prose-a:underline prose-a:decoration-ember-500/60;
+    @apply prose-code:text-sage-300 prose-code:bg-ink-800 prose-code:rounded prose-code:px-1.5 prose-code:py-0.5 prose-code:before:content-none prose-code:after:content-none;
+    @apply prose-pre:bg-ink-850 prose-pre:border prose-pre:border-ink-600;
+    @apply prose-blockquote:border-ember-600 prose-blockquote:text-paper-400;
+    @apply prose-li:my-1 prose-ul:my-2 prose-ol:my-2;
+    @apply prose-table:text-sm prose-th:text-paper-300 prose-td:border-ink-700 prose-th:border-ink-700;
+    @apply prose-hr:border-ink-700;
+    color: #d8cfba;
+    font-size: 0.95rem;
+  }
+
+  .grain-btn {
+    @apply relative overflow-hidden;
+  }
+}
+
+@keyframes caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.caret {
+  animation: caret 0.85s step-end infinite;
+}
