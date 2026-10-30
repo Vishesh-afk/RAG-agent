@@ -3,47 +3,75 @@ services:
     image: pgvector/pgvector:pg17
     container_name: postgres_pgvector
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-vector_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "6543:5432" 
+      - "6543:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-vector_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: agent_api
-    command: uvicorn agent.api:app --host ${APP_HOST} --port ${APP_PORT}
+    command: uvicorn agent.api:app --host ${APP_HOST:-0.0.0.0} --port ${APP_PORT:-8058}
+    env_file:
+      - .env
     ports:
-      - "${APP_PORT}:${APP_PORT}"
-    env_file: .env
+      - "${APP_PORT:-8058}:${APP_PORT:-8058}"
+    volumes:
+      - documents_data:/app/documents
     depends_on:
       postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8058/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+    container_name: rag_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      api:
         condition: service_healthy
     restart: unless-stopped
 
   ui:
+    profiles: ["streamlit"]
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: agent_ui
-    command: streamlit run ui/app.py --server.port=${SERVER_PORT} --server.address=${SERVER_HOST}
+    container_name: agent_streamlit
+    command: streamlit run ui/app.py --server.port=${SERVER_PORT:-8501} --server.address=${SERVER_HOST:-0.0.0.0}
+    env_file:
+      - .env
     ports:
-      - "${SERVER_PORT}:${SERVER_PORT}"
-    env_file: .env
+      - "${SERVER_PORT:-8501}:${SERVER_PORT:-8501}"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   postgres_data:
+    driver: local
+  documents_data:
     driver: local
