@@ -6,6 +6,14 @@ dist/
 wheels/
 *.egg-info
 .pytest_cache/
+
 # Virtual environments
-.venv
+.venv/
+venv/
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Local environment files
 .env
