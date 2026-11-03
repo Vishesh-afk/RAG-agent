@@ -1,0 +1,16 @@
+stages:
+  - validate
+
+python_syntax:
+  stage: validate
+  image: python:3.12-slim
+  script:
+    - python -m compileall -q agent ingestion ui
+
+frontend_build:
+  stage: validate
+  image: node:22-alpine
+  script:
+    - cd frontend
+    - npm ci
+    - npm run build
