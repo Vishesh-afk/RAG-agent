@@ -34,3 +34,17 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      - name: SonarQube Cloud scan and Quality Gate
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.sources=agent,ingestion,ui,frontend/src
+            -Dsonar.tests=tests
+            -Dsonar.test.inclusions=tests/**/*.py
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/__pycache__/**
+            -Dsonar.qualitygate.wait=true
