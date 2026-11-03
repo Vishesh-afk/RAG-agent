@@ -85,3 +85,7 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/ragagent-frontend:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/ragagent-frontend:latest
+          - name: Check secrets
+    run: |
+    if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then echo "USERNAME is EMPTY"; else echo "USERNAME is set"; fi
+    if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then echo "TOKEN is EMPTY"; else echo "TOKEN is set"; fi
