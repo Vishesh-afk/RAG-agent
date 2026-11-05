@@ -23,6 +23,24 @@ jobs:
       - name: Check Python syntax
         run: python -m compileall -q agent ingestion
 
+      - name: Install Python dependencies
+        run: pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt pytest-cov
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/ \
+            --ignore=tests/ingestion \
+            -m "not integration" \
+            --cov=agent \
+            --cov=ingestion \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing \
+            -q
+        env:
+          APP_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+          OPENAI_API_KEY: sk-test-key-for-ci
+
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
@@ -46,6 +64,7 @@ jobs:
             -Dsonar.sources=agent,ingestion,frontend/src
             -Dsonar.tests=tests
             -Dsonar.test.inclusions=tests/**/*.py
+            -Dsonar.python.coverage.reportPaths=coverage.xml
             -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/__pycache__/**
             -Dsonar.qualitygate.wait=true
 
@@ -217,4 +236,3 @@ jobs:
           require_status(status, 201, "direct GitOps commit to main")
           print(f"Updated both GitOps image tags on main to {tag}")
           PY
-
