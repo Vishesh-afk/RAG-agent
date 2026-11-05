@@ -1,7 +1,9 @@
 # RAG Agent DevOps Project Memory
 
 Last updated: 2026-11-05
+Last updated: 2026-11-05
 
+Use this file as the project continuity note before making recommendations or changes. It reflects the local repository and the recent Codex project chats. Prefer the newest verified state over older roadmap notes. Teach one practical checkpoint at a time in plain language, explain AWS cost implications before cost-incurring changes, and never read, print, commit, or expose `.env` or other secret values.
 Use this file as the project continuity note before making recommendations or changes. It reflects the local repository and the recent Codex project chats. Prefer the newest verified state over older roadmap notes. Teach one practical checkpoint at a time in plain language, explain AWS cost implications before cost-incurring changes, and never read, print, commit, or expose `.env` or other secret values.
 
 ## Target outcome
@@ -9,9 +11,14 @@ Use this file as the project continuity note before making recommendations or ch
 Build and demonstrate an end-to-end DevOps flow for the RAG Agent (React frontend, FastAPI backend, PostgreSQL/pgvector): GitHub Actions CI, SonarQube Quality Gate, DockerHub image publishing, GitOps manifests in a separate GitLab repo, ArgoCD deployment to EKS, then monitoring, autoscaling, AI observability, and production-readiness exercises.
 
 The user has emphasized that work they believe is complete should be checked against prior project chats before being marked remaining. Keep this file current after meaningful milestones and use it to resume work.
+Build and demonstrate an end-to-end DevOps flow for the RAG Agent (React frontend, FastAPI backend, PostgreSQL/pgvector): GitHub Actions CI, SonarQube Quality Gate, DockerHub image publishing, GitOps manifests in a separate GitLab repo, ArgoCD deployment to EKS, then monitoring, autoscaling, AI observability, and production-readiness exercises.
+
+The user has emphasized that work they believe is complete should be checked against prior project chats before being marked remaining. Keep this file current after meaningful milestones and use it to resume work.
 
 ## Current roadmap
+## Current roadmap
 
+| Phase | Area | Status / last known evidence |
 | Phase | Area | Status / last known evidence |
 |---|---|---|
 | 1 | Application and Docker | Baseline complete: React frontend, FastAPI backend, PostgreSQL/pgvector, Dockerfiles and Compose stack. |
