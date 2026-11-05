@@ -21,7 +21,7 @@ jobs:
           python-version: "3.12"
 
       - name: Check Python syntax
-        run: python -m compileall -q agent ingestion ui
+        run: python -m compileall -q agent ingestion
 
       - uses: actions/setup-node@v7
         with:
@@ -43,7 +43,7 @@ jobs:
           args: >
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
-            -Dsonar.sources=agent,ingestion,ui,frontend/src
+            -Dsonar.sources=agent,ingestion,frontend/src
             -Dsonar.tests=tests
             -Dsonar.test.inclusions=tests/**/*.py
             -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/__pycache__/**

@@ -1,82 +1,65 @@
-import os
-os.environ["TORCH_COMPILE_DISABLE"] = "1"
-os.environ["TORCHDYNAMO_DISABLE"] = "1"
-
 import logging
 import time
 from pathlib import Path
 from typing import Dict, Any, Tuple
 from dataclasses import dataclass
 
-# Docling imports
-from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1" # Disable symlink warnings
-
 @dataclass
 class PDFExtractionConfig:
-    """ PDF extraction configuration with GPU support"""
-    enable_ocr: bool = True
-    images_scale: float = 2.0
-    include_images: bool = True
-    include_tables: bool = True
+    """PDF extraction configuration."""
+    # OCR / image / table flags kept for API compatibility — pypdf ignores them.
+    # Re-enable docling (see optional section below) to make use of these.
+    enable_ocr: bool = False
+    images_scale: float = 1.0
+    include_images: bool = False
+    include_tables: bool = False
+
 
 class PDFExtractor:
-    """ PDF content extractor using Docling with GPU support, without table extraction."""
+    """PDF content extractor using pypdf (pure-Python, zero heavy deps).
+
+    Docling (PyTorch-based) has been removed from the default stack to keep
+    the Docker image lean (~1.5 GB saved).  To re-enable it locally, install
+    docling and set USE_DOCLING=1 in your environment — the code will pick it
+    up automatically via the optional path below.
+    """
 
     def __init__(self, config: PDFExtractionConfig = None):
         self.config = config or PDFExtractionConfig()
-        self.setup_converter()
 
-    def setup_converter(self):
-        """Setup Docling document converter with options optimized for stability."""
-        pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_ocr = self.config.enable_ocr
-        # Disable heavy picture description model to prevent std::bad_alloc memory spikes on large PDFs
-        pipeline_options.do_picture_description = False
-        pipeline_options.do_table_structure = self.config.include_tables
-        pipeline_options.images_scale = min(1.0, self.config.images_scale)
-        try:
-            self.converter = DocumentConverter(
-                format_options={
-                    InputFormat.PDF: PdfFormatOption(
-                        pipeline_options=pipeline_options
-                    )
-                }
-            )
-        except Exception as e:
-            logging.error(f"Failed to initialize docling: {e}")
+    # ------------------------------------------------------------------
+    # Primary extraction — pypdf (pure Python, no ML deps)
+    # ------------------------------------------------------------------
+
+    def extract_pdf_content(self, pdf_path: str) -> Tuple[str, Dict[str, Any]]:
+        """Extract content from a PDF file using pypdf."""
+        pdf_path = Path(pdf_path)
+        if not pdf_path.exists():
+            raise FileNotFoundError(f"PDF file not found: {pdf_path}")
+
+        logger.info(f"Extracting PDF content: {pdf_path.name}")
+        return self._extract_with_pypdf(pdf_path)
 
     def _extract_with_pypdf(self, pdf_path: Path) -> Tuple[str, Dict[str, Any]]:
-        """Fallback PDF extraction using pypdf for high stability."""
+        """Extract text from a PDF using pypdf."""
         import pypdf
-        logger.info(f"Using pypdf fallback extraction for {pdf_path.name}")
-        start_time = time.time()
 
+        start_time = time.time()
         reader = pypdf.PdfReader(str(pdf_path))
 
-        # Try to get a real title from PDF metadata first
-        title = pdf_path.stem
-        try:
-            pdf_info = reader.metadata
-            if pdf_info and pdf_info.title and pdf_info.title.strip():
-                title = pdf_info.title.strip()
-                logger.info(f"Using PDF metadata title (pypdf fallback): {title!r}")
-        except Exception:
-            pass
+        # --- title: PDF metadata → first non-empty page heading → filename ---
+        title = self._extract_title_pypdf(reader, pdf_path.stem)
 
         extracted_text = []
         for i, page in enumerate(reader.pages):
             page_text = page.extract_text() or ""
             if page_text.strip():
-                extracted_text.append(f"## Page {i+1}\n\n{page_text}")
+                extracted_text.append(f"## Page {i + 1}\n\n{page_text}")
 
         full_content = "\n\n".join(extracted_text)
         end_time = time.time()
@@ -90,87 +73,124 @@ class PDFExtractor:
             "texts": len(extracted_text),
             "pictures": 0,
             "tables": 0,
-            "extraction_method": "pypdf_fallback",
-            "content_type": "pdf"
+            "extraction_method": "pypdf",
+            "content_type": "pdf",
         }
         return full_content, metadata
 
-    def _extract_title_from_docling(self, doc, fallback: str) -> str:
-        """
-        Try to extract a meaningful document title from the Docling document.
-
-        Priority:
-        1. PDF metadata 'title' field (from the document properties / description)
-        2. First title/section-header element found in the document body
-        3. The provided fallback (filename stem)
-        """
-        # 1. Check PDF metadata stored by Docling under doc.description
+    @staticmethod
+    def _extract_title_pypdf(reader, fallback: str) -> str:
+        """Return the best available title from a pypdf PdfReader."""
+        # 1. PDF metadata /Title field
         try:
-            meta_title = getattr(doc, "description", None)
-            if meta_title and hasattr(meta_title, "title") and meta_title.title:
-                title = meta_title.title.strip()
-                if title:
-                    logger.info(f"Using PDF metadata title: {title!r}")
-                    return title
+            info = reader.metadata
+            if info and getattr(info, "title", None) and info.title.strip():
+                title = info.title.strip()
+                logger.info(f"Using PDF metadata title: {title!r}")
+                return title
         except Exception:
             pass
 
-        # 2. Walk body items for the first heading / title element
+        # 2. First non-trivially-short line of page 1 that looks like a heading
         try:
-            from docling_core.types.doc.labels import DocItemLabel
-            title_labels = {DocItemLabel.TITLE, DocItemLabel.SECTION_HEADER}
-            for item, _ in doc.iterate_items():
-                if getattr(item, "label", None) in title_labels:
-                    text = item.text.strip() if hasattr(item, "text") else ""
-                    if text:
-                        logger.info(f"Using first heading as title: {text!r}")
-                        return text
+            first_page_text = reader.pages[0].extract_text() or ""
+            for line in first_page_text.splitlines():
+                line = line.strip()
+                if 4 <= len(line) <= 120:
+                    logger.info(f"Using first page heading as title: {line!r}")
+                    return line
         except Exception:
             pass
 
-        logger.info(f"No title found in document; using filename stem: {fallback!r}")
+        logger.info(f"No title found; using filename stem: {fallback!r}")
         return fallback
 
-    def extract_pdf_content(self, pdf_path: str) -> Tuple[str, Dict[str, Any]]:
-        """Extract content from a single PDF file using Docling, with automatic fallback."""
-        pdf_path = Path(pdf_path)
-        if not pdf_path.exists():
-            raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-        logger.info(f"Extracting content with Docling: {pdf_path.name}")
-        start_time = time.time()
+# ---------------------------------------------------------------------------
+# Optional: Docling-based extractor (heavy — requires `pip install docling`)
+# Set USE_DOCLING=1 in your environment to activate.
+# ---------------------------------------------------------------------------
 
-        try:
-            result = self.converter.convert(str(pdf_path))
-            end_time = time.time()
+def _try_docling_extract(pdf_path: Path, config: PDFExtractionConfig) -> Tuple[str, Dict[str, Any]] | None:
+    """
+    Attempt extraction with Docling (AI-based layout parser).
+    Returns None if docling is not installed.
+    """
+    import os
+    if not os.getenv("USE_DOCLING"):
+        return None
 
-            doc = result.document
-            content_text = doc.export_to_markdown()
+    try:
+        import os as _os
+        _os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
+        _os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
 
-            if not content_text or len(content_text.strip()) == 0:
-                raise ValueError("Docling returned empty content")
+        from docling.document_converter import DocumentConverter, PdfFormatOption
+        from docling.datamodel.base_models import InputFormat
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
 
-            # Try to get a meaningful title; fall back to the filename stem
-            title = self._extract_title_from_docling(doc, fallback=pdf_path.stem)
+        pipeline_options = PdfPipelineOptions()
+        pipeline_options.do_ocr = config.enable_ocr
+        pipeline_options.do_picture_description = False
+        pipeline_options.do_table_structure = config.include_tables
+        pipeline_options.images_scale = min(1.0, config.images_scale)
 
-            metadata = {
-                "source": str(pdf_path),
-                "title": title,
-                "filename": pdf_path.stem,
-                "processing_time": round(end_time - start_time, 2),
-                "pages": len(doc.pages),
-                "texts": len(doc.texts),
-                "pictures": len(doc.pictures),
-                "tables": len(doc.tables),
-                "extraction_method": "docling",
-                "content_type": "pdf"
+        converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
             }
-            return content_text, metadata
-        except Exception as e:
-            logger.warning(f"Docling extraction failed for {pdf_path.name} ({e}), falling back to pypdf...")
-            return self._extract_with_pypdf(pdf_path)
+        )
+
+        start_time = time.time()
+        result = converter.convert(str(pdf_path))
+        doc = result.document
+        content_text = doc.export_to_markdown()
+
+        if not content_text or not content_text.strip():
+            return None
+
+        # Title extraction
+        title = pdf_path.stem
+        try:
+            meta_title = getattr(doc, "description", None)
+            if meta_title and getattr(meta_title, "title", None) and meta_title.title.strip():
+                title = meta_title.title.strip()
+        except Exception:
+            pass
+
+        if title == pdf_path.stem:
+            try:
+                from docling_core.types.doc.labels import DocItemLabel
+                for item, _ in doc.iterate_items():
+                    if getattr(item, "label", None) in {DocItemLabel.TITLE, DocItemLabel.SECTION_HEADER}:
+                        text = getattr(item, "text", "").strip()
+                        if text:
+                            title = text
+                            break
+            except Exception:
+                pass
+
+        return content_text, {
+            "source": str(pdf_path),
+            "title": title,
+            "filename": pdf_path.stem,
+            "processing_time": round(time.time() - start_time, 2),
+            "pages": len(doc.pages),
+            "texts": len(doc.texts),
+            "pictures": len(doc.pictures),
+            "tables": len(doc.tables),
+            "extraction_method": "docling",
+            "content_type": "pdf",
+        }
+
+    except ImportError:
+        logger.warning("USE_DOCLING=1 set but docling is not installed — falling back to pypdf.")
+        return None
+    except Exception as e:
+        logger.warning(f"Docling extraction failed ({e}) — falling back to pypdf.")
+        return None
 
 
 def create_pdf_extractor(config: PDFExtractionConfig = None) -> PDFExtractor:
-    """Create PDF extractor instance"""
+    """Create a PDF extractor instance."""
     return PDFExtractor(config)

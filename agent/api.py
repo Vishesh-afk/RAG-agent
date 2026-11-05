@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 import uvicorn
 from dotenv import load_dotenv
 from pydantic_ai.messages import PartStartEvent, PartDeltaEvent, TextPartDelta
@@ -90,9 +91,8 @@ async def lifespan(app: FastAPI):
         if not db_ok:
             logger.error("Database connection failed")
 
-        # Warm the default (fast-path) ingestion pipeline in the background so
-        # Docling's models are already loaded by the time the first upload
-        # arrives, without delaying server startup itself.
+        # Warm the default ingestion pipeline in the background so the first
+        # upload is served from an already-initialized pipeline.
         asyncio.create_task(_warm_default_ingestion_pipeline())
 
         logger.info("System startup complete")
@@ -130,6 +130,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Expose API request and process metrics for Prometheus scraping.
+Instrumentator(excluded_handlers=["/metrics", "/health"]).instrument(app).expose(
+    app, include_in_schema=False
+)
+
 # Add middleware — allow_origins=["*"] and allow_credentials=True are mutually
 # exclusive per the CORS spec; browsers reject that combination.
 # Use allow_credentials=False with wildcard origins for a public API.
@@ -145,11 +150,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 # ── Ingestion pipeline cache ────────────────────────────────────────────────
-# Docling's layout/table models are expensive to load (tens of seconds on CPU).
-# Building a fresh DocumentConverter per upload — as the old subprocess-per-file
-# flow did — pays that cost every single time. Instead we keep one pipeline per
-# (include_tables, include_images) combination alive for the life of the process,
-# so only the first request against a given combination is slow.
+# Ingestion pipelines are cached per (include_tables, include_images) combination
+# so only the first request against each option set pays the init cost.
 _ingestion_pipelines: Dict[Tuple[bool, bool], DocumentIngestionPipeline] = {}
 _ingestion_lock = asyncio.Lock()
 
@@ -520,11 +522,9 @@ async def ingest_document(
     """
     Upload and ingest a single PDF.
 
-    Runs in-process against a warm, cached Docling pipeline (see
-    get_ingestion_pipeline) instead of spawning a fresh subprocess per upload —
-    that used to force a full model reload every time. Table/image extraction
-    are opt-in: most PDFs are plain text and don't need Docling's much slower
-    table-structure model, so it's off by default.
+    Upload and ingest a single PDF using the cached ingestion pipeline.
+    Table/image flags are accepted for forward-compatibility; set USE_DOCLING=1
+    to enable AI-based layout extraction (requires: pip install docling).
     """
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")

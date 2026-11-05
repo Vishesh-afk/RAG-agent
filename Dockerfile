@@ -7,10 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml uv.lock ./
-RUN pip install uv && uv pip install --system -r pyproject.toml
+# Install deps first (separate layer — only rebuilds when requirements.txt changes)
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
 EXPOSE 8058
-EXPOSE 8501

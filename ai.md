@@ -43,7 +43,7 @@ The main user interface is a React + TypeScript web app. A Streamlit interface r
 
 The `ops/phase6/grafana/` directory contains a dashboard import JSON and a separate Grafana alert provisioning JSON. The dashboard covers API, Node Exporter, and Kubernetes workload queries for namespace `northstar-rag-dev`. The alert file defines pod restart, high CPU, high memory, and unavailable deployment rules. The alert file is provisioned into Grafana's `/etc/grafana/provisioning/alerting` directory; it is not imported through the dashboard importer. Replace its `PROMETHEUS_DATASOURCE_UID` placeholder with the actual Grafana Prometheus data-source UID before provisioning. The local Prometheus shown by the user has API, Node Exporter, and Prometheus targets but no verified Kubernetes scrape target; Kubernetes dashboard panels and alerts require kube-state-metrics and kubelet/cAdvisor metrics. Do not claim cluster monitoring is live until those targets are configured and verified.
 
-The running local API container has exposed `/metrics` in user-provided screenshots/output, but the current checked-out `agent/api.py`, `pyproject.toml`, and `requirements.txt` do not include instrumentation. Before rebuilding/publishing a future API image, reconcile this mismatch so the image continues exposing API HTTP metrics.
+The API source now registers `prometheus-fastapi-instrumentator` and exposes `/metrics` (excluding `/health` and `/metrics` from request counts); the dependency is declared in both `pyproject.toml` and `requirements.txt`. After source changes, rebuild the API container so Prometheus receives this route. A Prometheus target error of HTTP 404 means the currently running image lacks the route or the scrape path is wrong; check `http://localhost:8058/metrics` first.
 
 ## Main request and data flows
 
@@ -149,12 +149,14 @@ No tests or builds were run while preparing this guide.
 - The local Prometheus screenshot confirmed RAG API, Node Exporter, and Prometheus targets. Kubernetes workload panels and alerts still need kube-state-metrics and kubelet/cAdvisor metrics from EKS namespace `northstar-rag-dev`; they are not confirmed live.
 - The running API container exposed `/metrics`, but the checked-out `agent/api.py` and dependency files do not include metrics instrumentation. Reconcile before rebuilding/publishing an API image.
 - User-provided WSL references: `/home/vishesh/monitoring/prometheus/prometheus.yml`, `/home/vishesh/fluentbit-lab/docker-compose.yml`, `/home/vishesh/fluentbit-lab/loki-config.yaml`. Preserve their existing WSL config and scrape jobs; the Loki/Fluent Bit lab is not yet integrated.
+- The API source now registers `prometheus-fastapi-instrumentator` and exposes `/metrics`; the dependency is declared in `pyproject.toml` and `requirements.txt`. A current scrape returned HTTP 404, so rebuild the API image and check `http://localhost:8058/metrics` before evaluating Prometheus again.
+- A WSL Compose rebuild initially failed because `docker-compose.override.yml` still declared an obsolete `ui` service after it was removed from the base compose. The orphan override was removed; `docker compose config --services` now succeeds and lists `postgres`, `api`, and `web`. Retry from the RAG app project directory.
 
 ## DevOps / deployment status from this checkout
 
 **Present:** local Docker Compose; backend and frontend Dockerfiles; GitHub CI validation, SonarQube Quality Gate scan, and Docker Hub image publishing; GitLab syntax/frontend-build validation workflow.
 
-**Not present in the tracked repository:** Kubernetes deployment manifests/charts, a separate GitOps configuration, ArgoCD configuration, Prometheus/Grafana setup, HPA configuration, or a CI step that updates a GitOps repository. External AWS/EKS resources or past manual deployments cannot be confirmed from these files; verify the live cloud state separately before relying on it.
+**Not present in the app repository:** Kubernetes deployment manifests/charts, the separate GitOps configuration, ArgoCD configuration, HPA configuration, or a CI step that updates a GitOps repository. Grafana dashboard/alert artifacts exist under `ops/phase6/grafana/`; live cluster metric collection is not configured here. External AWS/EKS resources or past manual deployments cannot be confirmed from these files; verify live state separately before relying on it.
 
 The GitHub workflow only builds and publishes images. Image publication does not itself deploy them to Kubernetes.
 

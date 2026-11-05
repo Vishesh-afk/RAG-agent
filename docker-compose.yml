@@ -54,22 +54,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  ui:
-    profiles: ["streamlit"]
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: agent_streamlit
-    command: streamlit run ui/app.py --server.port=${SERVER_PORT:-8501} --server.address=${SERVER_HOST:-0.0.0.0}
-    env_file:
-      - .env
-    ports:
-      - "${SERVER_PORT:-8501}:${SERVER_PORT:-8501}"
-    depends_on:
-      api:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
   postgres_data:
     driver: local
