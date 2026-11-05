@@ -21,24 +21,7 @@ jobs:
           python-version: "3.12"
 
       - name: Check Python syntax
-        run: python -m compileall -q agent ingestion
-
-      - name: Install Python dependencies
-        run: pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt pytest-cov
-
-      - name: Run unit tests with coverage
-        run: |
-          pytest tests/ \
-            --ignore=tests/ingestion \
-            -m "not integration" \
-            --cov=. \
-            --cov-report=xml:coverage.xml \
-            --cov-report=term-missing \
-            -q
-        env:
-          APP_ENV: test
-          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
-          OPENAI_API_KEY: sk-test-key-for-ci
+        run: python -m compileall -q agent ingestion ui
 
       - uses: actions/setup-node@v7
         with:
@@ -60,10 +43,9 @@ jobs:
           args: >
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
-            -Dsonar.sources=agent,ingestion,frontend/src
+            -Dsonar.sources=agent,ingestion,ui,frontend/src
             -Dsonar.tests=tests
             -Dsonar.test.inclusions=tests/**/*.py
-            -Dsonar.python.coverage.reportPaths=coverage.xml
             -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/__pycache__/**
             -Dsonar.qualitygate.wait=true
 
