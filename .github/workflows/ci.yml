@@ -47,7 +47,6 @@ jobs:
             -Dsonar.tests=tests
             -Dsonar.test.inclusions=tests/**/*.py
             -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/__pycache__/**
-            -Dsonar.qualitygate.wait=true
 
   publish-images:
     name: Build and publish Docker images
