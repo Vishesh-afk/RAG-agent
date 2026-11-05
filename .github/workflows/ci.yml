@@ -31,8 +31,7 @@ jobs:
           pytest tests/ \
             --ignore=tests/ingestion \
             -m "not integration" \
-            --cov=agent \
-            --cov=ingestion \
+            --cov=. \
             --cov-report=xml:coverage.xml \
             --cov-report=term-missing \
             -q
