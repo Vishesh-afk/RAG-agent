@@ -60,10 +60,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Check Docker Hub secrets without printing values
+      - name: Check publishing secrets without printing values
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GITLAB_GITOPS_TOKEN: ${{ secrets.GITLAB_GITOPS_TOKEN }}
         shell: bash
         run: |
           if [[ -z "$DOCKERHUB_USERNAME" ]]; then
@@ -80,6 +81,11 @@ jobs:
             exit 1
           fi
           echo "DOCKERHUB_TOKEN is available (value hidden)"
+          if [[ -z "$GITLAB_GITOPS_TOKEN" ]]; then
+            echo "::error::GITLAB_GITOPS_TOKEN is missing; add it before publishing so the GitOps image tags can be updated"
+            exit 1
+          fi
+          echo "GITLAB_GITOPS_TOKEN is available (value hidden)"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -106,3 +112,109 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/ragagent-frontend:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/ragagent-frontend:latest
+
+  promote-gitops:
+    name: Update GitLab GitOps image tags
+    needs: publish-images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: gitops-dev-promotion
+      cancel-in-progress: false
+    steps:
+      - name: Commit the published image tags directly to GitOps main
+        env:
+          GITLAB_GITOPS_TOKEN: ${{ secrets.GITLAB_GITOPS_TOKEN }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          import re
+
+          token = os.environ["GITLAB_GITOPS_TOKEN"]
+          project = urllib.parse.quote("visheshchourasia143/rag-agent-gitops", safe="")
+          api = f"https://gitlab.com/api/v4/projects/{project}"
+          branch = "main"
+          tag = os.environ["IMAGE_TAG"]
+          targets = {
+              "apps/rag-agent/base/api-deployment.yaml": b"vishesh11/ragagent-backend",
+              "apps/rag-agent/base/frontend-deployment.yaml": b"vishesh11/ragagent-frontend",
+          }
+
+          def request(url, method="GET", payload=None):
+              data = None if payload is None else json.dumps(payload).encode("utf-8")
+              req = urllib.request.Request(
+                  url,
+                  data=data,
+                  method=method,
+                  headers={
+                      "PRIVATE-TOKEN": token,
+                      "Content-Type": "application/json",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      return response.status, response.read()
+              except urllib.error.HTTPError as error:
+                  return error.code, error.read()
+
+          def require_status(status, expected, operation):
+              if status != expected:
+                  raise SystemExit(f"GitLab {operation} failed with HTTP {status}; check token scope and Developer access to the GitOps project")
+
+          def read_file(path, ref):
+              encoded_path = urllib.parse.quote(path, safe="")
+              url = f"{api}/repository/files/{encoded_path}?{urllib.parse.urlencode({'ref': ref})}"
+              status, body = request(url)
+              require_status(status, 200, f"read of {path}")
+              return base64.b64decode(json.loads(body)["content"])
+
+          def image_pattern(image):
+              return re.compile(rb"(?m)^([ \t]*image:[ \t]*" + re.escape(image) + rb":)([^\s#]+)")
+
+          main_images = {}
+          for path, image in targets.items():
+              original = read_file(path, branch)
+              matches = image_pattern(image).findall(original)
+              if len(matches) != 1:
+                  raise SystemExit(f"Expected exactly one image reference for {image.decode()} in {path}; found {len(matches)}")
+              main_images[path] = matches[0][1].decode()
+
+          if all(current_tag == tag for current_tag in main_images.values()):
+              print(f"GitOps main already references both images at {tag}")
+              raise SystemExit(0)
+
+          actions = []
+          for path, image in targets.items():
+              original = read_file(path, branch)
+              pattern = image_pattern(image)
+              updated, count = pattern.subn(lambda match: match.group(1) + tag.encode(), original)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one image reference for {image.decode()} in {path}; found {count}")
+              if updated != original:
+                  actions.append({"action": "update", "file_path": path, "content": updated.decode("utf-8")})
+
+          if not actions:
+              print(f"GitOps main already references both images at {tag}")
+              raise SystemExit(0)
+
+          status, body = request(
+              f"{api}/repository/commits",
+              method="POST",
+              payload={
+                  "branch": branch,
+                  "commit_message": f"Promote RAG Agent images to {tag[:12]}",
+                  "actions": actions,
+              },
+          )
+          if status == 403:
+              raise SystemExit("GitLab rejected the direct commit (HTTP 403). Allow the GitOps token's bot account to push to protected main, then rerun this job.")
+          require_status(status, 201, "direct GitOps commit to main")
+          print(f"Updated both GitOps image tags on main to {tag}")
+          PY
+
