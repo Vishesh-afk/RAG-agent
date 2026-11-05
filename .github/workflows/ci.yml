@@ -114,7 +114,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/ragagent-frontend:latest
 
   promote-gitops:
-    name: Update GitOps image tags
+    name: Open GitOps image promotion merge request
     needs: publish-images
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -122,7 +122,7 @@ jobs:
       group: gitops-dev-promotion
       cancel-in-progress: false
     steps:
-      - name: Promote published image tags in GitOps repo
+      - name: Create merge request with the published image tags
         env:
           GITLAB_GITOPS_TOKEN: ${{ secrets.GITLAB_GITOPS_TOKEN }}
           IMAGE_TAG: ${{ github.sha }}
@@ -138,13 +138,14 @@ jobs:
 
           token = os.environ["GITLAB_GITOPS_TOKEN"]
           project = urllib.parse.quote("visheshchourasia143/rag-agent-gitops", safe="")
-          api = f"https://gitlab.com/api/v4/projects/{project}/repository"
+          api = f"https://gitlab.com/api/v4/projects/{project}"
           branch = "main"
           tag = os.environ["IMAGE_TAG"]
           targets = {
               "apps/rag-agent/base/api-deployment.yaml": b"vishesh11/ragagent-backend",
               "apps/rag-agent/base/frontend-deployment.yaml": b"vishesh11/ragagent-frontend",
           }
+          promotion_branch = f"codex/promote-{tag[:12]}"
 
           def request(url, method="GET", payload=None):
               data = None if payload is None else json.dumps(payload).encode("utf-8")
@@ -159,33 +160,86 @@ jobs:
               )
               try:
                   with urllib.request.urlopen(req, timeout=30) as response:
-                      return response.read()
+                      return response.status, response.read()
               except urllib.error.HTTPError as error:
-                  raise SystemExit(
-                      f"GitLab API request failed with HTTP {error.code}; check token scope, project access, and main-branch write permission"
-                  ) from None
+                  return error.code, error.read()
+
+          def require_status(status, expected, operation):
+              if status != expected:
+                  raise SystemExit(f"GitLab {operation} failed with HTTP {status}; check token scope and Developer access to the GitOps project")
+
+          def read_file(path, ref):
+              encoded_path = urllib.parse.quote(path, safe="")
+              url = f"{api}/repository/files/{encoded_path}?{urllib.parse.urlencode({'ref': ref})}"
+              status, body = request(url)
+              require_status(status, 200, f"read of {path}")
+              return base64.b64decode(json.loads(body)["content"])
+
+          def image_pattern(image):
+              return re.compile(rb"(?m)^([ \t]*image:[ \t]*" + re.escape(image) + rb":)([^\s#]+)")
+
+          main_images = {}
+          for path, image in targets.items():
+              original = read_file(path, branch)
+              matches = image_pattern(image).findall(original)
+              if len(matches) != 1:
+                  raise SystemExit(f"Expected exactly one image reference for {image.decode()} in {path}; found {len(matches)}")
+              main_images[path] = matches[0][1].decode()
+
+          if all(current_tag == tag for current_tag in main_images.values()):
+              print(f"GitOps main already references both images at {tag}")
+              raise SystemExit(0)
+
+          branch_url = f"{api}/repository/branches"
+          status, _ = request(branch_url, method="POST", payload={"branch": promotion_branch, "ref": branch})
+          if status not in (201, 400, 409):
+              require_status(status, 201, "promotion branch creation")
+          if status != 201:
+              existing_url = f"{branch_url}/{urllib.parse.quote(promotion_branch, safe='')}"
+              existing_status, _ = request(existing_url)
+              require_status(existing_status, 200, "existing promotion branch lookup")
 
           actions = []
           for path, image in targets.items():
-              encoded_path = urllib.parse.quote(path, safe="")
-              url = f"{api}/files/{encoded_path}?{urllib.parse.urlencode({'ref': branch})}"
-              file_data = json.loads(request(url))
-              original = base64.b64decode(file_data["content"])
-              pattern = re.compile(rb"(?m)^([ \t]*image:[ \t]*" + re.escape(image) + rb":)[^\s#]+")
+              original = read_file(path, promotion_branch)
+              pattern = image_pattern(image)
               updated, count = pattern.subn(lambda match: match.group(1) + tag.encode(), original)
               if count != 1:
                   raise SystemExit(f"Expected exactly one image reference for {image.decode()} in {path}; found {count}")
-              actions.append({"action": "update", "file_path": path, "content": updated.decode("utf-8")})
+              if updated != original:
+                  actions.append({"action": "update", "file_path": path, "content": updated.decode("utf-8")})
 
-          request(
-              f"{api}/commits",
+          if actions:
+              status, _ = request(
+                  f"{api}/repository/commits",
+                  method="POST",
+                  payload={
+                      "branch": promotion_branch,
+                      "commit_message": f"Promote RAG Agent images to {tag[:12]}",
+                      "actions": actions,
+                  },
+              )
+              require_status(status, 201, "promotion commit")
+
+          query = urllib.parse.urlencode({"state": "opened", "source_branch": promotion_branch, "target_branch": branch})
+          status, body = request(f"{api}/merge_requests?{query}")
+          require_status(status, 200, "open merge request lookup")
+          open_requests = json.loads(body)
+          if open_requests:
+              print(f"GitOps promotion merge request already exists: {open_requests[0]['web_url']}")
+              raise SystemExit(0)
+
+          status, body = request(
+              f"{api}/merge_requests",
               method="POST",
               payload={
-                  "branch": branch,
-                  "commit_message": f"Promote RAG Agent images to {tag[:12]}",
-                  "actions": actions,
+                  "source_branch": promotion_branch,
+                  "target_branch": branch,
+                  "title": f"Promote RAG Agent images to {tag[:12]}",
+                  "description": "Automated image tag update from the passing GitHub Actions release workflow. Review and merge this change; Argo CD remains on manual sync.",
               },
           )
-          print(f"Updated backend and frontend GitOps tags to {tag}")
+          require_status(status, 201, "merge request creation")
+          print(f"Opened GitOps promotion merge request: {json.loads(body)['web_url']}")
           PY
 
