@@ -28,6 +28,15 @@ The repository includes PDFs under `documents/`, including a resume. They are ex
 - `.env` is ignored by Git. Keep real API keys there and never commit them.
 - The Compose database password is a local-learning default. Replace it with managed secrets for shared or cloud deployments.
 
+## Current Phase 6 handoff
+
+- The user verified the RAG API scrape and imported an API dashboard into Grafana; Prometheus returned request-rate data.
+- Import `ops/phase6/grafana/rag-agent-application-cluster-dashboard.json` through Grafana's dashboard importer and select the Prometheus data source.
+- `ops/phase6/grafana/northstar-kubernetes-alerts.json` is a separate Grafana alert-rule provisioning file. Replace `PROMETHEUS_DATASOURCE_UID`, mount it under `/etc/grafana/provisioning/alerting/`, then restart Grafana. Set up a contact point/policy separately if notifications are wanted.
+- Kubernetes workload panels and rules need Prometheus to scrape kube-state-metrics and kubelet/cAdvisor for `northstar-rag-dev`; local Prometheus screenshots only prove app, Node Exporter, and Prometheus targets. Don't claim cluster metrics are live until checked.
+- The user's running API served `/metrics`, but the source API and dependency files currently lack instrumentation. Resolve that before rebuilding/publishing the API image.
+- Preserve the user's WSL practice files: `/home/vishesh/monitoring/prometheus/prometheus.yml`, `/home/vishesh/fluentbit-lab/docker-compose.yml`, and `/home/vishesh/fluentbit-lab/loki-config.yaml`.
+
 ## Learning path
 
 1. Understand and run the application locally.

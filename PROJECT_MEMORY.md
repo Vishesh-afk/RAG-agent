@@ -1,6 +1,6 @@
 # RAG Agent DevOps Project Memory
 
-Last updated: 2026-11-03
+Last updated: 2026-11-05
 
 Use this file as the project continuity note before making recommendations or changes. The user's current target plan below supersedes older learning notes in `DEVOPS-HANDS-ON.md` where they conflict. Teach one practical checkpoint at a time in plain language. Prefer AWS/GitHub web consoles for cloud setup and give exact WSL commands only where a console cannot do the job. Explain why a resource is needed, avoid surprise AWS costs, and include a clear verification step. Do not read, print, commit, or expose `.env` or other secret values.
 
@@ -26,7 +26,7 @@ Acceptance challenges: Quality Gate failure blocks release; no manual `kubectl a
 | 3 | CI/CD | In progress. Existing Jenkins-to-ECR pipeline is a learning baseline; the revised target is GitHub Actions, SonarQube, DockerHub, and GitOps tag update. |
 | 4 | Kubernetes deployment | Next target phase. EKS currently runs the app manually; standardize manifests and let ArgoCD deploy them from Git. |
 | 5 | GitOps | Planned: separate GitOps repo, ArgoCD auto-sync and self-heal. |
-| 6 | Monitoring and logging | Planned: Prometheus, Grafana, dashboards, and alerts. Fluent Bit/log collection can be added when scoped. |
+| 6 | Monitoring and logging | User has a working local Prometheus scrape for the RAG API, Node Exporter, and Prometheus; imported an API dashboard into Grafana and verified request-rate data. New import artifacts: `ops/phase6/grafana/rag-agent-application-cluster-dashboard.json` and `ops/phase6/grafana/northstar-kubernetes-alerts.json`. The latter provisions Grafana-managed rules for pod restarts, high CPU, high memory, and unavailable deployments; replace `PROMETHEUS_DATASOURCE_UID`, mount it under Grafana `provisioning/alerting`, then restart. Dashboard import is via Grafana UI; alert provisioning is separate. Kubernetes panels/rules need kube-state-metrics and kubelet/cAdvisor in Prometheus; current local target evidence does not confirm those metrics. Alert notification contact point/policy separate. Loki/Fluent Bit integration remains unverified. Running container exposed `/metrics`, but checked-out source/dependency files lack instrumentation—resolve before next API image build. |
 | 7 | Autoscaling | Planned: HPA first; verify metrics support. Karpenter later, only if needed and after cost review. |
 | 8 | AI observability | Planned: Arize Phoenix. |
 | 9 | Production readiness | Planned: security, reliability, rollout/rollback, cost, and operational review. |
@@ -91,4 +91,4 @@ The user saw active GitLab.com instance runners, but reports GitLab will not all
 
 ## Immediate next checkpoint
 
-The user chose GitHub Actions due GitLab's build verification/card requirement. Next, synchronize local committed `main` (currently pushed to GitLab) to GitHub `origin` after checking the GitHub repo visibility. Then add the first GitHub Actions workflow in `.github/workflows/`. Preserve the current local code edits and `.vscode/`; `.env` remains local. Do not push local secrets. Keep GitLab repositories intact as backups/reference; avoid creating `.gitlab-ci.yml` or a new Jenkins job unless the user changes direction.
+Phase 6 handoff: dashboard JSON is ready at `ops/phase6/grafana/rag-agent-application-cluster-dashboard.json`; import it using **Dashboards → New → Import** and select Prometheus. Alert rules are in `ops/phase6/grafana/northstar-kubernetes-alerts.json`; replace the Prometheus data source UID placeholder and provision the file into `/etc/grafana/provisioning/alerting/` (Grafana dashboard import does not import alert rules). Configure notification contact point/policy separately. Confirm Prometheus scrapes kube-state-metrics and kubelet/cAdvisor before expecting Kubernetes panels and alerts to have data. Preserve existing WSL Compose files and scrape configs. User WSL references: `/home/vishesh/monitoring/prometheus/prometheus.yml`, `/home/vishesh/fluentbit-lab/docker-compose.yml`, `/home/vishesh/fluentbit-lab/loki-config.yaml`.

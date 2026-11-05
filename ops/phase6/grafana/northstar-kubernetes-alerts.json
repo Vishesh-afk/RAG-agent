@@ -1,0 +1,169 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "northstar-rag-workloads",
+      "folder": "RAG Agent",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "northstar-pod-restarts",
+          "title": "Northstar pod restarting frequently",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": { "from": 900, "to": 0 },
+              "datasourceUid": "PROMETHEUS_DATASOURCE_UID",
+              "model": {
+                "expr": "sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=\"northstar-rag-dev\"}[15m]))",
+                "instant": true,
+                "refId": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200
+              }
+            },
+            {
+              "refId": "B",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [{ "evaluator": { "params": [2], "type": "gt" }, "operator": { "type": "and" }, "query": { "params": ["A"] }, "reducer": { "params": [], "type": "last" }, "type": "query" }],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "hide": false,
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "classic_conditions"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "5m",
+          "annotations": { "summary": "A Northstar pod restarted at least 3 times in 15 minutes.", "description": "Check the pod logs and recent deployment changes." },
+          "labels": { "severity": "warning", "team": "rag-agent" },
+          "isPaused": false
+        },
+        {
+          "uid": "northstar-high-cpu",
+          "title": "Northstar pod CPU above 90 percent of request",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": { "from": 600, "to": 0 },
+              "datasourceUid": "PROMETHEUS_DATASOURCE_UID",
+              "model": {
+                "expr": "sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=\"northstar-rag-dev\",container!=\"\",image!=\"\"}[5m])) / on(namespace, pod) sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=\"northstar-rag-dev\",resource=\"cpu\"})",
+                "instant": true,
+                "refId": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200
+              }
+            },
+            {
+              "refId": "B",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [{ "evaluator": { "params": [0.9], "type": "gt" }, "operator": { "type": "and" }, "query": { "params": ["A"] }, "reducer": { "params": [], "type": "last" }, "type": "query" }],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "hide": false,
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "classic_conditions"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "10m",
+          "annotations": { "summary": "A Northstar pod used more than 90% of its requested CPU for 10 minutes.", "description": "Check CPU limits, recent traffic, and replica capacity." },
+          "labels": { "severity": "warning", "team": "rag-agent" },
+          "isPaused": false
+        },
+        {
+          "uid": "northstar-high-memory",
+          "title": "Northstar pod memory above 90 percent of request",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": { "from": 600, "to": 0 },
+              "datasourceUid": "PROMETHEUS_DATASOURCE_UID",
+              "model": {
+                "expr": "sum by (namespace, pod) (container_memory_working_set_bytes{namespace=\"northstar-rag-dev\",container!=\"\",image!=\"\"}) / on(namespace, pod) sum by (namespace, pod) (kube_pod_container_resource_requests{namespace=\"northstar-rag-dev\",resource=\"memory\"})",
+                "instant": true,
+                "refId": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200
+              }
+            },
+            {
+              "refId": "B",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [{ "evaluator": { "params": [0.9], "type": "gt" }, "operator": { "type": "and" }, "query": { "params": ["A"] }, "reducer": { "params": [], "type": "last" }, "type": "query" }],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "hide": false,
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "classic_conditions"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "10m",
+          "annotations": { "summary": "A Northstar pod used more than 90% of its requested memory for 10 minutes.", "description": "Check memory limits, pod logs, and recent workload changes." },
+          "labels": { "severity": "warning", "team": "rag-agent" },
+          "isPaused": false
+        },
+        {
+          "uid": "northstar-deployment-unavailable",
+          "title": "Northstar deployment has unavailable replicas",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": { "from": 600, "to": 0 },
+              "datasourceUid": "PROMETHEUS_DATASOURCE_UID",
+              "model": {
+                "expr": "sum by (namespace, deployment) (kube_deployment_status_replicas_unavailable{namespace=\"northstar-rag-dev\"})",
+                "instant": true,
+                "refId": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200
+              }
+            },
+            {
+              "refId": "B",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [{ "evaluator": { "params": [0], "type": "gt" }, "operator": { "type": "and" }, "query": { "params": ["A"] }, "reducer": { "params": [], "type": "last" }, "type": "query" }],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "hide": false,
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "classic_conditions"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "5m",
+          "annotations": { "summary": "A Northstar deployment has unavailable replicas for 5 minutes.", "description": "Check pod readiness, events, and the latest deployment rollout." },
+          "labels": { "severity": "critical", "team": "rag-agent" },
+          "isPaused": false
+        }
+      ]
+    }
+  ]
+}
