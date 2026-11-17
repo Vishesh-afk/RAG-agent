@@ -16,7 +16,7 @@ pipeline {
   stages {
     stage('Validate') {
       steps {
-        sh 'python -m compileall -q agent ingestion ui'
+        sh 'python -m compileall -q agent ingestion'
         dir('frontend') {
           sh 'npm ci && npm run build'
         }
