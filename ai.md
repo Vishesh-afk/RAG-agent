@@ -148,7 +148,6 @@ No tests or builds were run while preparing this guide.
 - API source includes `prometheus-fastapi-instrumentator` and exposes `/metrics`. The existing Grafana/Prometheus work is separate from the Minikube GitOps deployment and still needs live verification against Minikube.
 - User-provided WSL references: `/home/vishesh/monitoring/prometheus/prometheus.yml`, `/home/vishesh/fluentbit-lab/docker-compose.yml`, `/home/vishesh/fluentbit-lab/loki-config.yaml`. Preserve their existing WSL config and scrape jobs; the Loki/Fluent Bit lab is not yet integrated.
 - The API source registers `prometheus-fastapi-instrumentator` and exposes `/metrics`; the dependency is declared in `pyproject.toml` and `requirements.txt`. If Prometheus returns HTTP 404, rebuild the API image and check `http://localhost:8058/metrics` before evaluating the target again.
-- A WSL Compose rebuild initially failed because `docker-compose.override.yml` still declared an obsolete `ui` service after it was removed from the base compose. The orphan override was removed; `docker compose config --services` now succeeds and lists `postgres`, `api`, and `web`. Retry from the RAG app project directory.
 
 ## DevOps / deployment status from this checkout
 
