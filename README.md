@@ -45,7 +45,6 @@ A modern Agentic RAG (Retrieval-Augmented Generation) system built with Pydantic
 
 - [PostgreSQL 17](https://www.postgresql.org/) - Primary database
 - [Docker Compose](https://docs.docker.com/compose/) - Multi-container deployment
-- [uv](https://github.com/astral-sh/uv) - Fast Python package installer
 
 ## 🚀 Installation
 
