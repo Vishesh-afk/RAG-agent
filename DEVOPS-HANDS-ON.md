@@ -1,3 +1,83 @@
+<<<<<<< HEAD
+# DevOps hands-on setup
+
+Target learning path: GitHub application repository → Jenkins CI → Docker Hub images → separate GitHub GitOps repository → Argo CD deployment to local Minikube. This application repository contains source and the Jenkins pipeline; Kubernetes desired state belongs in `rag-agent-gitops`. Runtime settings come from a local Kubernetes Secret created from `.env`. Grafana/Prometheus artifacts exist, but cluster monitoring must be checked against Minikube before calling it live.
+
+## Start locally
+
+1. Install and start Docker Desktop.
+2. Copy `.env.example` to `.env` and add an OpenAI API key when you are ready to use chat or embeddings. The checked-in `.env.example` has no key.
+3. From this directory, run:
+
+   ```sh
+   docker compose up --build
+   ```
+
+4. Open the React app at <http://localhost:3000>. API docs are at <http://localhost:8058/docs>.
+
+The database is published on port `6543` and its data persists in the `postgres_data` volume. User-uploaded PDFs persist in `documents_data`.
+
+Stop the stack with `docker compose down`. To remove the local database and uploaded-document volumes too, run `docker compose down -v`.
+
+## Data handling
+
+The repository includes PDFs under `documents/`, including a resume. They are excluded from Docker build contexts and are not loaded into the database automatically. Upload only documents you choose through the app; ingestion sends document text to the configured embedding provider.
+
+## Current local configuration notes
+
+- The API image uses Python 3.12 to match `pyproject.toml`.
+- `.env` is ignored by Git. Keep real API keys there and never commit them.
+- The Compose database password is a local-learning default. Replace it with managed secrets for shared or cloud deployments.
+
+## Local Kubernetes delivery
+
+### Jenkins prerequisites
+
+- Configure a Multibranch Pipeline to use this GitHub repository's `Jenkinsfile`, with a GitHub webhook for push events.
+- Jenkins agent needs Python 3.12, Node.js 22/npm, Docker Engine access, Git, and the Jenkins Docker Pipeline, Credentials Binding, SSH Agent, and Workspace Cleanup plugins.
+- Add Jenkins credential `dockerhub` as a username/password credential containing the Docker Hub username and access token.
+- Add `github-gitops-deploy-key` as an SSH private key with write access to the separate `rag-agent-gitops` repository.
+- Run a successful job on `main`; feature branches only run validation. Jenkins publishes SHA and `latest` tags for both images, then commits the SHA tags to `apps/rag-agent/overlays/minikube` in the GitOps repository.
+
+### Minikube, Argo CD, and external secrets
+
+The public `rag-agent-gitops` repository keeps manifests under `apps/rag-agent/overlays/minikube/` and the Argo CD Application under `clusters/minikube/apps/`. Install Argo CD in Minikube before syncing the application. Apply the Application resource once to register it; after that, Argo CD owns application resources. The repo is public, so Argo CD does not need a GitHub read credential.
+
+Before the first sync, create the namespace and runtime Secret locally from the app repo's ignored `.env` file:
+
+```sh
+kubectl create namespace rag-agent --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic rag-agent-runtime --from-env-file=.env --namespace rag-agent
+```
+
+The `.env` file must contain `DB_USER`, `DB_PASSWORD`, and `OPENAI_API_KEY` (plus optional model settings). The Secret stays in Minikube and is not committed. PostgreSQL reads its database credentials from it on first startup. Changing the Secret later does not rotate a password in an existing PostgreSQL data directory automatically.
+
+The API image is private and the deployment references `dockerhub-auth` in namespace `rag-agent`. Create that image pull secret locally before the first sync. The frontend is served through its NodePort service; use `minikube service frontend -n rag-agent --url` to open it. PostgreSQL uses a local 8 GiB PVC, which is not a backup.
+
+### Disabled pipeline
+
+GitHub Actions, SonarQube, and GitLab CI are not part of this path. CI runs in Jenkins; CD runs through Argo CD from the separate GitOps repository. Runtime settings use a local Kubernetes Secret created from `.env`.
+
+## Monitoring handoff
+
+- The user verified the RAG API scrape and imported an API dashboard into Grafana; Prometheus returned request-rate data.
+- Import `ops/phase6/grafana/rag-agent-application-cluster-dashboard.json` through Grafana's dashboard importer and select the Prometheus data source.
+- `ops/phase6/grafana/northstar-kubernetes-alerts.json` is a separate Grafana alert-rule provisioning file. Replace `PROMETHEUS_DATASOURCE_UID`, mount it under `/etc/grafana/provisioning/alerting/`, then restart Grafana. Set up a contact point/policy separately if notifications are wanted.
+- Kubernetes workload panels and rules need Prometheus to scrape kube-state-metrics and kubelet/cAdvisor for `northstar-rag-dev`; local Prometheus screenshots only prove app, Node Exporter, and Prometheus targets. Don't claim cluster metrics are live until checked.
+- The API source includes `/metrics` instrumentation. Verify the running image and Prometheus target against Minikube before relying on application panels.
+- Preserve the user's WSL practice files: `/home/vishesh/monitoring/prometheus/prometheus.yml`, `/home/vishesh/fluentbit-lab/docker-compose.yml`, and `/home/vishesh/fluentbit-lab/loki-config.yaml`.
+
+## Learning path
+
+1. Understand and run the application locally.
+2. Container and configuration hardening.
+3. Jenkins CI and Docker Hub image publishing.
+4. Argo CD GitOps deployment to Minikube.
+5. AWS Secrets Manager integration and local bootstrap identity.
+6. Verify Prometheus/Grafana Kubernetes metrics and alerts.
+7. HPA and AI observability after a healthy baseline.
+8. Production readiness and failure exercises.
+=======
 # DevOps hands-on setup
 
 Target learning path: GitHub application repository → Jenkins CI → Docker Hub images → separate GitHub GitOps repository → Argo CD deployment to local Minikube. This application repository contains source and the Jenkins pipeline; Kubernetes desired state belongs in `rag-agent-gitops`. AWS Secrets Manager holds runtime credentials. Grafana/Prometheus artifacts exist, but cluster monitoring must be checked against Minikube before calling it live.
@@ -71,4 +151,6 @@ GitHub Actions, SonarQube, and GitLab CI are not part of this path. CI runs in J
 6. Verify Prometheus/Grafana Kubernetes metrics and alerts.
 7. HPA and AI observability after a healthy baseline.
 8. Production readiness and failure exercises.
+
+>>>>>>> 990604b51ffbbeefc4baca89b28cba0b0b3c65dd
 
