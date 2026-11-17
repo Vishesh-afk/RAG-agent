@@ -46,7 +46,7 @@ pipeline {
         }
       }
       steps {
-        withCredentials([gitUsernamePassword(credentialsId: 'github-gitops-write-token', gitToolName: 'Default')]) {
+        withCredentials([gitUsernamePassword(credentialsId: 'github-gitops-deploy-key', gitToolName: 'Default')]) {
           dir('gitops') {
             deleteDir()
             sh '''
