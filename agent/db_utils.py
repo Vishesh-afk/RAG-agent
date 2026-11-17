@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 import logging
+from urllib.parse import quote
 
 import asyncpg
 from asyncpg.pool import Pool
@@ -32,7 +33,10 @@ class DatabasePool:
         PORT = os.getenv("DB_PORT", 5432)
         DBNAME = os.getenv("DB_NAME", "postgres")
 
-        self.database_url = database_url or os.getenv("DATABASE_URL") or f"postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}"
+        self.database_url = database_url or os.getenv("DATABASE_URL") or (
+            f"postgresql://{quote(str(USER), safe='')}:{quote(str(PASSWORD), safe='')}"
+            f"@{HOST}:{PORT}/{DBNAME}"
+        )
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable not set")
         

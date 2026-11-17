@@ -6,7 +6,7 @@ This file is a current, code-based guide for AI assistants and developers workin
 
 This repository contains a document-question-answering RAG application. Users upload PDF files, the backend extracts and chunks their content, creates embeddings, and stores documents and chunks in PostgreSQL with pgvector. A Pydantic AI agent can search those chunks and answer questions. Chat history is stored by session.
 
-The main user interface is a React + TypeScript web app. A Streamlit interface remains available as an optional, older/alternate UI. The project also contains Docker Compose configuration and CI workflows.
+The user interface is a React + TypeScript web app. The project also contains Docker Compose configuration and a Jenkins pipeline.
 
 ## What is implemented
 
@@ -15,10 +15,10 @@ The main user interface is a React + TypeScript web app. A Streamlit interface r
 - PostgreSQL access and persistence in `agent/db_utils.py`; the schema is initialized from `sql/schema.sql` and uses pgvector, UUIDs, trigram search, and PostgreSQL full-text search.
 - PDF ingestion in `ingestion/`: Docling extraction with a pypdf fallback, semantic or recursive chunking, OpenAI embeddings, and transactional document/chunk writes.
 - React chat interface in `frontend/` with streamed responses, session ID retention in browser session storage, health polling, document listing, uploads, and deletion controls.
-- Alternate Streamlit interface in `ui/app.py`, served through the backend API.
-- Docker Compose services for PostgreSQL, API, and React frontend. Streamlit is opt-in with the `streamlit` profile.
-- GitHub Actions workflow at `.github/workflows/ci.yml`: Python syntax compilation, frontend production build, SonarQube Cloud scan with Quality Gate waiting, and Docker Hub publishing on pushes to `main` after validation succeeds.
-- A GitLab CI workflow at `.gitlab-ci.yml` that checks Python syntax and builds the frontend.
+- Docker Compose services for PostgreSQL, API, and React frontend.
+- Jenkins pipeline at `Jenkinsfile`: Python syntax compilation, frontend production build, Docker Hub publishing on `main`, and promotion of SHA image tags into the Minikube GitOps overlay.
+- GitHub Actions and GitLab CI files have been removed from the application repository; CI runs in Jenkins. SonarQube is not part of the selected path.
+- Kubernetes manifests and the Argo CD Application belong in the separate `rag-agent-gitops` GitHub repository; Jenkins writes SHA image tags there. AWS Secrets Manager is consumed through External Secrets Operator. See `DEVOPS-HANDS-ON.md` for Jenkins credential IDs and local bootstrap steps.
 - Unit-focused tests for models, database helpers, and chunking under `tests/`.
 
 ## Repository map
@@ -28,18 +28,17 @@ The main user interface is a React + TypeScript web app. A Streamlit interface r
 | `agent/` | FastAPI API, Pydantic AI agent, tools, provider configuration, models, and database helpers |
 | `ingestion/` | PDF extraction, chunking, embeddings, and database ingestion pipeline |
 | `frontend/` | React + TypeScript + Vite user interface and Nginx container config |
-| `ui/` | Optional Streamlit user interface |
 | `sql/schema.sql` | Tables, indexes, database functions, triggers, and view |
 | `tests/` | Pytest fixtures and tests for models, DB helpers, and chunking |
 | `documents/` | Local PDF examples/input data; excluded from Docker build contexts and ignored by Git |
-| `.github/workflows/ci.yml` | GitHub validation, SonarQube, and image publishing workflow |
-| `.gitlab-ci.yml` | GitLab syntax/build validation workflow |
+| `Jenkinsfile` | Jenkins validation, Docker Hub publishing, and Minikube GitOps image-tag promotion |
+| `rag-agent-gitops` GitHub repository | Separate desired state for Minikube workloads and Argo CD Application |
 | `docker-compose.yml` | Local multi-service app stack |
 | `docker-compose.override.yml` | Local development mounts and API reload settings |
 | `ops/phase6/grafana/` | Grafana dashboard JSON for RAG API + Kubernetes metrics, and Grafana alert-rule provisioning JSON |
 | `ops/phase6/local/` | Prometheus scrape fragment and local API alert reference/runbook |
-| `PROJECT_MEMORY.md` | Older project continuity and cloud-roadmap notes; parts may be stale compared with this guide and current files |
-| `DEVOPS-HANDS-ON.md` | Local setup and older learning roadmap; roadmap mentions Bitbucket/Jenkins and may not match the newer GitHub Actions direction |
+| `PROJECT_MEMORY.md` | Historical project continuity; older AWS/EKS details may no longer match the selected local Minikube target |
+| `DEVOPS-HANDS-ON.md` | Current Jenkins, Docker Hub, Argo CD, Minikube, and Secrets Manager setup notes |
 
 The `ops/phase6/grafana/` directory contains a dashboard import JSON and a separate Grafana alert provisioning JSON. The dashboard covers API, Node Exporter, and Kubernetes workload queries for namespace `northstar-rag-dev`. The alert file defines pod restart, high CPU, high memory, and unavailable deployment rules. The alert file is provisioned into Grafana's `/etc/grafana/provisioning/alerting` directory; it is not imported through the dashboard importer. Replace its `PROMETHEUS_DATASOURCE_UID` placeholder with the actual Grafana Prometheus data-source UID before provisioning. The local Prometheus shown by the user has API, Node Exporter, and Prometheus targets but no verified Kubernetes scrape target; Kubernetes dashboard panels and alerts require kube-state-metrics and kubelet/cAdvisor metrics. Do not claim cluster monitoring is live until those targets are configured and verified.
 
@@ -96,7 +95,6 @@ For exact request and response models, use `agent/models.py` and the route imple
    ```
 
 3. Open the frontend at `http://localhost:3000`, API docs at `http://localhost:8058/docs`, and PostgreSQL at host port `6543` if needed.
-4. To include Streamlit, run `docker compose --profile streamlit up --build`; the UI uses the configured server port, normally `8501`.
 
 The Compose stack persists PostgreSQL data in `postgres_data` and uploaded documents in `documents_data`. `docker compose down -v` removes those local volumes and their data.
 
@@ -112,7 +110,7 @@ Start the frontend separately with `npm run dev` from `frontend/`. The Vite app 
 
 ## Configuration and external services
 
-Configuration is loaded from environment variables and `.env`. `.env.example` lists the intended local variables: API host/port and logging, database host/port/name/user/password, OpenAI API key, LLM choice, embedding model, and optional Streamlit host/port. Do not copy secrets into this file or this guide.
+Configuration is loaded from environment variables and `.env`. `.env.example` lists the intended local variables: API host/port and logging, database host/port/name/user/password, OpenAI API key, LLM choice, and embedding model. Do not copy secrets into this file or this guide.
 
 The agent uses the OpenAI-compatible Pydantic AI provider. Embeddings use `text-embedding-3-small` by default; the SQL functions and vector column are currently sized for 1536 dimensions. If changing embedding models, check vector dimensions and re-ingest existing content as needed.
 
@@ -138,7 +136,7 @@ Tests currently cover Pydantic models, database helper behavior, and chunker beh
 pytest
 ```
 
-The GitHub Actions workflow currently runs `python -m compileall -q agent ingestion ui` and the frontend production build before the SonarQube scan. It does not currently run pytest. The Docker publishing job runs only on pushes to `main` and publishes backend and frontend images tagged with the commit SHA and `latest` after validation succeeds. SonarQube organization/project variables, `SONAR_TOKEN`, and Docker Hub credentials must be configured in GitHub for those jobs to succeed. Do not expose credential values in logs.
+Jenkins in `Jenkinsfile` runs Python syntax compilation and the frontend production build on branches. On `main`, it publishes backend and frontend images tagged with the commit SHA and `latest`, then updates those tags in the separate GitOps repository. It does not currently run pytest or SonarQube. Configure Docker Hub and GitOps write credentials in Jenkins; do not expose credential values in logs.
 
 No tests or builds were run while preparing this guide.
 
@@ -146,19 +144,16 @@ No tests or builds were run while preparing this guide.
 
 - The user verified local RAG API metrics in Prometheus and imported an API dashboard into Grafana; the API request-rate query returned data.
 - `ops/phase6/grafana/rag-agent-application-cluster-dashboard.json` is the combined app/cluster dashboard import. `ops/phase6/grafana/northstar-kubernetes-alerts.json` contains Grafana-managed workload alerts for restarts, CPU, memory, and unavailable deployments. Alert rules use file provisioning, not Dashboard → Import; replace `PROMETHEUS_DATASOURCE_UID`, mount the file under `/etc/grafana/provisioning/alerting/`, and restart Grafana.
-- The local Prometheus screenshot confirmed RAG API, Node Exporter, and Prometheus targets. Kubernetes workload panels and alerts still need kube-state-metrics and kubelet/cAdvisor metrics from EKS namespace `northstar-rag-dev`; they are not confirmed live.
-- The running API container exposed `/metrics`, but the checked-out `agent/api.py` and dependency files do not include metrics instrumentation. Reconcile before rebuilding/publishing an API image.
+- The local Prometheus screenshot confirmed RAG API, Node Exporter, and Prometheus targets. Kubernetes workload panels and alerts still need kube-state-metrics and kubelet/cAdvisor metrics from the Minikube namespace `rag-agent`; they are not confirmed live there.
+- API source includes `prometheus-fastapi-instrumentator` and exposes `/metrics`. The existing Grafana/Prometheus work is separate from the Minikube GitOps deployment and still needs live verification against Minikube.
 - User-provided WSL references: `/home/vishesh/monitoring/prometheus/prometheus.yml`, `/home/vishesh/fluentbit-lab/docker-compose.yml`, `/home/vishesh/fluentbit-lab/loki-config.yaml`. Preserve their existing WSL config and scrape jobs; the Loki/Fluent Bit lab is not yet integrated.
-- The API source now registers `prometheus-fastapi-instrumentator` and exposes `/metrics`; the dependency is declared in `pyproject.toml` and `requirements.txt`. A current scrape returned HTTP 404, so rebuild the API image and check `http://localhost:8058/metrics` before evaluating Prometheus again.
-- A WSL Compose rebuild initially failed because `docker-compose.override.yml` still declared an obsolete `ui` service after it was removed from the base compose. The orphan override was removed; `docker compose config --services` now succeeds and lists `postgres`, `api`, and `web`. Retry from the RAG app project directory.
+- The API source registers `prometheus-fastapi-instrumentator` and exposes `/metrics`; the dependency is declared in `pyproject.toml` and `requirements.txt`. If Prometheus returns HTTP 404, rebuild the API image and check `http://localhost:8058/metrics` before evaluating the target again.
 
 ## DevOps / deployment status from this checkout
 
-**Present:** local Docker Compose; backend and frontend Dockerfiles; GitHub CI validation, SonarQube Quality Gate scan, and Docker Hub image publishing; GitLab syntax/frontend-build validation workflow.
+**Present:** local Docker Compose; backend and frontend Dockerfiles; Jenkins pipeline source; public GitHub GitOps repository with Minikube manifests and an Argo CD Application.
 
-**Not present in the app repository:** Kubernetes deployment manifests/charts, the separate GitOps configuration, ArgoCD configuration, HPA configuration, or a CI step that updates a GitOps repository. Grafana dashboard/alert artifacts exist under `ops/phase6/grafana/`; live cluster metric collection is not configured here. External AWS/EKS resources or past manual deployments cannot be confirmed from these files; verify live state separately before relying on it.
-
-The GitHub workflow only builds and publishes images. Image publication does not itself deploy them to Kubernetes.
+Kubernetes manifests and the Argo CD Application intentionally live in the separate public repository `Vishesh-afk/rag-agent-gitops`. Jenkins publishes images and commits SHA tags there; Argo CD deployment to Minikube is not yet installed or verified. Grafana dashboard/alert artifacts remain under `ops/phase6/grafana/`; Kubernetes metrics collection against Minikube is not confirmed.
 
 ## Working guidance for future AI assistants
 

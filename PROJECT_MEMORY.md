@@ -1,5 +1,9 @@
 # RAG Agent DevOps Project Memory
 
+## Current direction (2026-11-17)
+
+The current target supersedes the older EKS/GitLab roadmap below: GitHub is application source, Jenkins runs CI and publishes SHA-tagged frontend/backend images to Docker Hub, and Argo CD deploys from a separate GitHub GitOps repository to local Minikube. Public repo `Vishesh-afk/rag-agent-gitops` now contains the overlay at `apps/rag-agent/overlays/minikube/` and Argo CD Application at `clusters/minikube/apps/rag-agent.yaml`. The app repository should contain application source and `Jenkinsfile`; the separate repo contains deployment manifests. Grafana/Prometheus artifacts remain in this app repository, but Kubernetes monitoring on Minikube is not verified. Runtime app credentials (DB user/password, OpenAI key, model settings) are intended for AWS Secrets Manager and are synchronized by External Secrets Operator. Local Minikube needs a separate narrowly scoped AWS read-only bootstrap identity; this is not an EKS workload identity. The manifest currently targets the last known AWS region, `us-east-2`. See `DEVOPS-HANDS-ON.md` for prerequisites. GitHub Actions and GitLab CI files have been removed from the application working tree. Do not treat historical EKS state below as the current deployment target.
+
 Last updated: 2026-11-05
 Last updated: 2026-11-05
 

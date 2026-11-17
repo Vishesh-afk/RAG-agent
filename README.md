@@ -39,13 +39,12 @@ A modern Agentic RAG (Retrieval-Augmented Generation) system built with Pydantic
 
 ### Frontend
 
-- [Streamlit](https://streamlit.io/) - Interactive web interface
+- React + TypeScript - Interactive web interface
 
 ### Infrastructure
 
 - [PostgreSQL 17](https://www.postgresql.org/) - Primary database
 - [Docker Compose](https://docs.docker.com/compose/) - Multi-container deployment
-- [uv](https://github.com/astral-sh/uv) - Fast Python package installer
 
 ## 🚀 Installation
 
@@ -74,10 +73,6 @@ APP_HOST=0.0.0.0
 APP_PORT=8058
 API_URL=http://api:8058
 
-# Streamlit Configuration
-SERVER_PORT=8501
-SERVER_HOST=0.0.0.0
-
 # PostgreSQL Vector DB Configuration
 DB_USER=postgres
 DB_PASSWORD=postgres
@@ -102,7 +97,7 @@ docker-compose logs -f
 
 ### Web Interface
 
-Access the Streamlit UI: <http://localhost:8501>
+Access the web interface: <http://localhost:3000>
 
 The web interface now includes:
 
@@ -223,8 +218,6 @@ ntt_rag_project/
 │   ├── chunker.py         # Text chunking
 │   ├── extract_files.py   # PDF extraction
 │   └── ingest.py          # Main ingestion pipeline
-├── ui/                    # Streamlit UI
-│   └── app.py
 ├── sql/                   # Database schema
 │   └── schema.sql
 ├── tests/                 # Test files
@@ -298,7 +291,6 @@ docker-compose logs -f api
 | `DB_PASSWORD` | PostgreSQL password | - |
 | `OPENAI_API_KEY` | OpenAI API key | - |
 | `APP_PORT` | FastAPI port | `8058` |
-| `SERVER_PORT` | Streamlit port | `8501` |
 | `LLM_MODEL` | LLM model | `gpt-4` |
 | `EMBEDDING_MODEL` | Embedding model | `text-embedding-3-small` |
 
@@ -327,14 +319,8 @@ echo $OPENAI_API_KEY
 
 ```bash
 netstat -an | grep :8058
-netstat -an | grep :8501
 ```
 
 ## 📄 License
 
 MIT License - See `LICENSE` for details.
-
----
-#   R A G - a g e n t  
- #   R A G - a g e n t  
- 
