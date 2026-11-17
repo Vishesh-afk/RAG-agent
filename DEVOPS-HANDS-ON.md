@@ -14,7 +14,7 @@ Target learning path: GitHub application repository → Jenkins CI → Docker Hu
 
 4. Open the React app at <http://localhost:3000>. API docs are at <http://localhost:8058/docs>.
 
-The database is published on port `6543` and its data persists in the `postgres_data` volume. User-uploaded PDFs persist in `documents_data`. The default stack does not start the older Streamlit interface; start it separately with `docker compose --profile streamlit up --build` if you want to compare it.
+The database is published on port `6543` and its data persists in the `postgres_data` volume. User-uploaded PDFs persist in `documents_data`.
 
 Stop the stack with `docker compose down`. To remove the local database and uploaded-document volumes too, run `docker compose down -v`.
 
