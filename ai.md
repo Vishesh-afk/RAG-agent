@@ -19,6 +19,7 @@ The user interface is a React + TypeScript web app. The project also contains Do
 - Jenkins pipeline at `Jenkinsfile`: Python syntax compilation, frontend production build, Docker Hub publishing on `main`, and promotion of SHA image tags into the Minikube GitOps overlay.
 - GitHub Actions and GitLab CI files have been removed from the application repository; CI runs in Jenkins. SonarQube is not part of the selected path.
 - Kubernetes manifests and the Argo CD Application belong in the separate `rag-agent-gitops` GitHub repository; Jenkins writes SHA image tags there. Minikube runtime settings come from a local Kubernetes Secret created from the ignored `.env` file. See `DEVOPS-HANDS-ON.md` for setup steps.
+- Kubernetes manifests and the Argo CD Application belong in the separate `rag-agent-gitops` GitHub repository; Jenkins writes SHA image tags there. Minikube runtime settings come from a local Kubernetes Secret created from the ignored `.env` file. See `DEVOPS-HANDS-ON.md` for setup steps.
 - Unit-focused tests for models, database helpers, and chunking under `tests/`.
 
 ## Repository map
@@ -38,7 +39,7 @@ The user interface is a React + TypeScript web app. The project also contains Do
 | `ops/phase6/grafana/` | Grafana dashboard JSON for RAG API + Kubernetes metrics, and Grafana alert-rule provisioning JSON |
 | `ops/phase6/local/` | Prometheus scrape fragment and local API alert reference/runbook |
 | `PROJECT_MEMORY.md` | Historical project continuity; older AWS/EKS details may no longer match the selected local Minikube target |
-| `DEVOPS-HANDS-ON.md` | Current Jenkins, Docker Hub, Argo CD, Minikube, and Secrets Manager setup notes |
+| `DEVOPS-HANDS-ON.md` | Current Jenkins, Docker Hub, Argo CD, Minikube, and local Kubernetes Secret setup notes |
 
 The `ops/phase6/grafana/` directory contains a dashboard import JSON and a separate Grafana alert provisioning JSON. The dashboard covers API, Node Exporter, and Kubernetes workload queries for namespace `northstar-rag-dev`. The alert file defines pod restart, high CPU, high memory, and unavailable deployment rules. The alert file is provisioned into Grafana's `/etc/grafana/provisioning/alerting` directory; it is not imported through the dashboard importer. Replace its `PROMETHEUS_DATASOURCE_UID` placeholder with the actual Grafana Prometheus data-source UID before provisioning. The local Prometheus shown by the user has API, Node Exporter, and Prometheus targets but no verified Kubernetes scrape target; Kubernetes dashboard panels and alerts require kube-state-metrics and kubelet/cAdvisor metrics. Do not claim cluster monitoring is live until those targets are configured and verified.
 
@@ -169,4 +170,5 @@ Kubernetes manifests and the Argo CD Application intentionally live in the separ
 ## Current inspection note
 
 This guide was prepared on 2026-11-05 from the repository files and tracked layout. At inspection, `git status` was clean on `main`, tracking `gitlab/main`; both `origin` (GitHub) and `gitlab` remotes were configured. Recheck these mutable facts when resuming work.
+
 
