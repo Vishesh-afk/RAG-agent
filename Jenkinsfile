@@ -9,7 +9,7 @@ pipeline {
   environment {
     BACKEND_IMAGE = 'vishesh11/ragagent-backend'
     FRONTEND_IMAGE = 'vishesh11/ragagent-frontend'
-    GITOPS_REPO = 'git@github.com:Vishesh-afk/rag-agent-gitops.git'
+    GITOPS_REPO = 'https://github.com/Vishesh-afk/rag-agent-gitops.git'
     GITOPS_PATH = 'apps/rag-agent/overlays/minikube'
   }
 
@@ -24,7 +24,6 @@ pipeline {
     }
 
     stage('Build and publish images') {
-      when { branch 'main' }
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_TOKEN')]) {
           sh '''
@@ -45,7 +44,7 @@ pipeline {
     stage('Promote GitOps manifests') {
       when { branch 'main' }
       steps {
-        sshagent(credentials: ['github-gitops-deploy-key']) {
+        withCredentials([gitUsernamePassword(credentialsId: 'github-gitops-write-token', gitToolName: 'Default')]) {
           dir('gitops') {
             deleteDir()
             sh '''
