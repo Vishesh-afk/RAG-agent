@@ -14,9 +14,8 @@ pipeline {
   }
 
   stages {
-      }
-    }
 
+    
     stage('Build and publish images') {
       when {
         expression {
