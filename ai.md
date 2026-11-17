@@ -38,7 +38,7 @@ The user interface is a React + TypeScript web app. The project also contains Do
 | `ops/phase6/grafana/` | Grafana dashboard JSON for RAG API + Kubernetes metrics, and Grafana alert-rule provisioning JSON |
 | `ops/phase6/local/` | Prometheus scrape fragment and local API alert reference/runbook |
 | `PROJECT_MEMORY.md` | Historical project continuity; older AWS/EKS details may no longer match the selected local Minikube target |
-| `DEVOPS-HANDS-ON.md` | Current Jenkins, Docker Hub, Argo CD, Minikube, and Secrets Manager setup notes |
+| `DEVOPS-HANDS-ON.md` | Current Jenkins, Docker Hub, Argo CD, Minikube, and local Kubernetes Secret setup notes |
 
 The `ops/phase6/grafana/` directory contains a dashboard import JSON and a separate Grafana alert provisioning JSON. The dashboard covers API, Node Exporter, and Kubernetes workload queries for namespace `northstar-rag-dev`. The alert file defines pod restart, high CPU, high memory, and unavailable deployment rules. The alert file is provisioned into Grafana's `/etc/grafana/provisioning/alerting` directory; it is not imported through the dashboard importer. Replace its `PROMETHEUS_DATASOURCE_UID` placeholder with the actual Grafana Prometheus data-source UID before provisioning. The local Prometheus shown by the user has API, Node Exporter, and Prometheus targets but no verified Kubernetes scrape target; Kubernetes dashboard panels and alerts require kube-state-metrics and kubelet/cAdvisor metrics. Do not claim cluster monitoring is live until those targets are configured and verified.
 
