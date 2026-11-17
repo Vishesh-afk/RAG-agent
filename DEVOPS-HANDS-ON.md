@@ -71,3 +71,4 @@ GitHub Actions, SonarQube, and GitLab CI are not part of this path. CI runs in J
 6. Verify Prometheus/Grafana Kubernetes metrics and alerts.
 7. HPA and AI observability after a healthy baseline.
 8. Production readiness and failure exercises.
+
