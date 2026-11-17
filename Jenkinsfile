@@ -23,7 +23,7 @@ pipeline {
         }
       }
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_TOKEN')]) {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_TOKEN')]) {
           sh '''
             set +x
             printf '%s' "$DOCKER_TOKEN" | docker login --username "$DOCKER_USER" --password-stdin
