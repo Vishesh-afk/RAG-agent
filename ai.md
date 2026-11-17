@@ -18,7 +18,7 @@ The user interface is a React + TypeScript web app. The project also contains Do
 - Docker Compose services for PostgreSQL, API, and React frontend.
 - Jenkins pipeline at `Jenkinsfile`: Python syntax compilation, frontend production build, Docker Hub publishing on `main`, and promotion of SHA image tags into the Minikube GitOps overlay.
 - GitHub Actions and GitLab CI files have been removed from the application repository; CI runs in Jenkins. SonarQube is not part of the selected path.
-- Kubernetes manifests and the Argo CD Application belong in the separate `rag-agent-gitops` GitHub repository; Jenkins writes SHA image tags there. AWS Secrets Manager is consumed through External Secrets Operator. See `DEVOPS-HANDS-ON.md` for Jenkins credential IDs and local bootstrap steps.
+- Kubernetes manifests and the Argo CD Application belong in the separate `rag-agent-gitops` GitHub repository; Jenkins writes SHA image tags there. Minikube runtime settings come from a local Kubernetes Secret created from the ignored `.env` file. See `DEVOPS-HANDS-ON.md` for setup steps.
 - Unit-focused tests for models, database helpers, and chunking under `tests/`.
 
 ## Repository map
@@ -169,4 +169,5 @@ Kubernetes manifests and the Argo CD Application intentionally live in the separ
 ## Current inspection note
 
 This guide was prepared on 2026-11-05 from the repository files and tracked layout. At inspection, `git status` was clean on `main`, tracking `gitlab/main`; both `origin` (GitHub) and `gitlab` remotes were configured. Recheck these mutable facts when resuming work.
+
 
