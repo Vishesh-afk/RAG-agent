@@ -24,6 +24,11 @@ pipeline {
     }
 
     stage('Build and publish images') {
+      when {
+        expression {
+          env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'main' || env.GIT_BRANCH == 'origin/main'
+        }
+      }
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_TOKEN')]) {
           sh '''
@@ -42,7 +47,11 @@ pipeline {
     }
 
     stage('Promote GitOps manifests') {
-      when { branch 'main' }
+      when {
+        expression {
+          env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'main' || env.GIT_BRANCH == 'origin/main'
+        }
+      }
       steps {
         withCredentials([gitUsernamePassword(credentialsId: 'github-gitops-write-token', gitToolName: 'Default')]) {
           dir('gitops') {
