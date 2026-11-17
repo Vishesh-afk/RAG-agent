@@ -6,7 +6,7 @@ This file is a current, code-based guide for AI assistants and developers workin
 
 This repository contains a document-question-answering RAG application. Users upload PDF files, the backend extracts and chunks their content, creates embeddings, and stores documents and chunks in PostgreSQL with pgvector. A Pydantic AI agent can search those chunks and answer questions. Chat history is stored by session.
 
-The main user interface is a React + TypeScript web app. A Streamlit interface remains available as an optional, older/alternate UI. The project also contains Docker Compose configuration and CI workflows.
+The user interface is a React + TypeScript web app. The project also contains Docker Compose configuration and a Jenkins pipeline.
 
 ## What is implemented
 
@@ -15,8 +15,7 @@ The main user interface is a React + TypeScript web app. A Streamlit interface r
 - PostgreSQL access and persistence in `agent/db_utils.py`; the schema is initialized from `sql/schema.sql` and uses pgvector, UUIDs, trigram search, and PostgreSQL full-text search.
 - PDF ingestion in `ingestion/`: Docling extraction with a pypdf fallback, semantic or recursive chunking, OpenAI embeddings, and transactional document/chunk writes.
 - React chat interface in `frontend/` with streamed responses, session ID retention in browser session storage, health polling, document listing, uploads, and deletion controls.
-- Alternate Streamlit interface in `ui/app.py`, served through the backend API.
-- Docker Compose services for PostgreSQL, API, and React frontend. Streamlit is opt-in with the `streamlit` profile.
+- Docker Compose services for PostgreSQL, API, and React frontend.
 - Jenkins pipeline at `Jenkinsfile`: Python syntax compilation, frontend production build, Docker Hub publishing on `main`, and promotion of SHA image tags into the Minikube GitOps overlay.
 - GitHub Actions and GitLab CI files have been removed from the application repository; CI runs in Jenkins. SonarQube is not part of the selected path.
 - Kubernetes manifests and the Argo CD Application belong in the separate `rag-agent-gitops` GitHub repository; Jenkins writes SHA image tags there. AWS Secrets Manager is consumed through External Secrets Operator. See `DEVOPS-HANDS-ON.md` for Jenkins credential IDs and local bootstrap steps.
@@ -29,7 +28,6 @@ The main user interface is a React + TypeScript web app. A Streamlit interface r
 | `agent/` | FastAPI API, Pydantic AI agent, tools, provider configuration, models, and database helpers |
 | `ingestion/` | PDF extraction, chunking, embeddings, and database ingestion pipeline |
 | `frontend/` | React + TypeScript + Vite user interface and Nginx container config |
-| `ui/` | Optional Streamlit user interface |
 | `sql/schema.sql` | Tables, indexes, database functions, triggers, and view |
 | `tests/` | Pytest fixtures and tests for models, DB helpers, and chunking |
 | `documents/` | Local PDF examples/input data; excluded from Docker build contexts and ignored by Git |
@@ -97,7 +95,6 @@ For exact request and response models, use `agent/models.py` and the route imple
    ```
 
 3. Open the frontend at `http://localhost:3000`, API docs at `http://localhost:8058/docs`, and PostgreSQL at host port `6543` if needed.
-4. To include Streamlit, run `docker compose --profile streamlit up --build`; the UI uses the configured server port, normally `8501`.
 
 The Compose stack persists PostgreSQL data in `postgres_data` and uploaded documents in `documents_data`. `docker compose down -v` removes those local volumes and their data.
 
@@ -113,7 +110,7 @@ Start the frontend separately with `npm run dev` from `frontend/`. The Vite app 
 
 ## Configuration and external services
 
-Configuration is loaded from environment variables and `.env`. `.env.example` lists the intended local variables: API host/port and logging, database host/port/name/user/password, OpenAI API key, LLM choice, embedding model, and optional Streamlit host/port. Do not copy secrets into this file or this guide.
+Configuration is loaded from environment variables and `.env`. `.env.example` lists the intended local variables: API host/port and logging, database host/port/name/user/password, OpenAI API key, LLM choice, and embedding model. Do not copy secrets into this file or this guide.
 
 The agent uses the OpenAI-compatible Pydantic AI provider. Embeddings use `text-embedding-3-small` by default; the SQL functions and vector column are currently sized for 1536 dimensions. If changing embedding models, check vector dimensions and re-ingest existing content as needed.
 
