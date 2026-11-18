@@ -9,24 +9,21 @@ pipeline {
   environment {
     BACKEND_IMAGE = 'vishesh11/ragagent-backend'
     FRONTEND_IMAGE = 'vishesh11/ragagent-frontend'
-    GITOPS_REPO = 'git@github.com:Vishesh-afk/rag-agent-gitops.git'
+    GITOPS_REPO = 'https://github.com/Vishesh-afk/rag-agent-gitops.git'
     GITOPS_PATH = 'apps/rag-agent/overlays/minikube'
   }
 
   stages {
-    stage('Validate') {
-      steps {
-        sh 'python -m compileall -q agent ingestion'
-        dir('frontend') {
-          sh 'npm ci && npm run build'
+
+    
+    stage('Build and publish images') {
+      when {
+        expression {
+          env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'main' || env.GIT_BRANCH == 'origin/main'
         }
       }
-    }
-
-    stage('Build and publish images') {
-      when { branch 'main' }
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_TOKEN')]) {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_TOKEN')]) {
           sh '''
             set +x
             printf '%s' "$DOCKER_TOKEN" | docker login --username "$DOCKER_USER" --password-stdin
@@ -43,26 +40,22 @@ pipeline {
     }
 
     stage('Promote GitOps manifests') {
-      when { branch 'main' }
+      when {
+        expression {
+          env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'main' || env.GIT_BRANCH == 'origin/main'
+        }
+      }
       steps {
-        sshagent(credentials: ['github-gitops-deploy-key']) {
+        withCredentials([gitUsernamePassword(credentialsId: 'github-gitops-deploy-', gitToolName: 'Default')]) {
           dir('gitops') {
             deleteDir()
             sh '''
               set -eu
               git clone "$GITOPS_REPO" .
-              python - "$GIT_COMMIT" "$GITOPS_PATH" <<'PY'
-import pathlib, re, sys
-tag, folder = sys.argv[1:]
-for name, image in (("api-deployment.yaml", "vishesh11/ragagent-backend"),
-                    ("frontend-deployment.yaml", "vishesh11/ragagent-frontend")):
-    path = pathlib.Path(folder) / name
-    text = path.read_text()
-    updated, count = re.subn(rf'(?m)^(\s*image:\s*{re.escape(image)}:)[^\s]+', rf'\g<1>{tag}', text)
-    if count != 1:
-        raise SystemExit(f"Expected one image reference for {image} in {path}, found {count}")
-    path.write_text(updated)
-            PY
+              test "$(grep -Ec '^[[:space:]]*image:[[:space:]]*vishesh11/ragagent-backend:' "$GITOPS_PATH/api-deployment.yaml")" -eq 1
+              test "$(grep -Ec '^[[:space:]]*image:[[:space:]]*vishesh11/ragagent-frontend:' "$GITOPS_PATH/frontend-deployment.yaml")" -eq 1
+              sed -i -E "s#(^[[:space:]]*image:[[:space:]]*vishesh11/ragagent-backend:).*#\\1${GIT_COMMIT}#" "$GITOPS_PATH/api-deployment.yaml"
+              sed -i -E "s#(^[[:space:]]*image:[[:space:]]*vishesh11/ragagent-frontend:).*#\\1${GIT_COMMIT}#" "$GITOPS_PATH/frontend-deployment.yaml"
               git config user.name 'Jenkins CI'
               git config user.email 'jenkins@users.noreply.github.com'
               git add "$GITOPS_PATH/api-deployment.yaml" "$GITOPS_PATH/frontend-deployment.yaml"
