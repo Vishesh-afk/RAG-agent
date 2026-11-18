@@ -1,5 +1,28 @@
 # Grafana app and Kubernetes dashboard + alerts
 
+## Local Docker monitoring setup
+
+The local Prometheus container is already configured to scrape `rag-agent-api` at
+`host.docker.internal:8058/metrics`, along with Prometheus and Node Exporter. The
+RAG API target was verified `UP` at `http://localhost:9090/targets`.
+
+To provision the Prometheus data source and dashboard into the running Grafana
+container from the repository root:
+
+```powershell
+docker cp .\ops\phase6\grafana\provisioning\datasources\prometheus.yml grafana:/etc/grafana/provisioning/datasources/prometheus.yml
+docker cp .\ops\phase6\grafana\provisioning\dashboards\rag-agent.yml grafana:/etc/grafana/provisioning/dashboards/rag-agent.yml
+docker exec grafana mkdir -p /var/lib/grafana/dashboards/rag-agent
+docker cp .\ops\phase6\grafana\provisioning\dashboards\rag-agent.json grafana:/var/lib/grafana/dashboards/rag-agent/rag-agent.json
+docker restart grafana
+```
+
+Grafana is available at `http://localhost:3001`. The dashboard will be under
+the **RAG Agent** folder. The provisioning files are kept in this repository;
+repeat the copy steps if the Grafana container is recreated. API and Node
+Exporter panels work with the local targets. Kubernetes panels require
+Kubernetes metrics sources and will remain empty until those are scraped.
+
 ## Dashboard
 
 Import `rag-agent-application-cluster-dashboard.json` from **Dashboards → New → Import** and choose the Prometheus data source. It includes API availability, request volume/rate, server errors, p95 latency, pod readiness/restarts, pod CPU/memory, and node CPU/memory.
